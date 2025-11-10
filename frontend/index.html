@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MammoViewer - DICOM to STL Converter</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <h1 class="title">DICOM to STL Converter</h1>
+            <p class="subtitle">Convert mammography DICOM images to 3D printable STL models</p>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container">
+        <!-- Upload Section -->
+        <section id="upload-section" class="card">
+            <h2>Upload DICOM Files</h2>
+            <p class="section-description">
+                Select or drag-and-drop DICOM files from a mammography scan.
+                Supports .dcm and .dicom files.
+            </p>
+
+            <div id="drop-zone" class="drop-zone">
+                <div class="drop-zone-content">
+                    <svg class="upload-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                    <p class="drop-zone-text">Drag and drop DICOM files here</p>
+                    <p class="drop-zone-subtext">or</p>
+                    <label for="file-input" class="btn btn-secondary">
+                        Browse Files
+                    </label>
+                    <input type="file" id="file-input" multiple accept=".dcm,.dicom,.DCM,.DICOM" hidden>
+                    <p class="file-info">Maximum 100 files, 500MB total</p>
+                </div>
+            </div>
+
+            <div id="file-list" class="file-list"></div>
+
+            <button id="upload-btn" class="btn btn-primary" style="display: none;">
+                Upload Files
+            </button>
+        </section>
+
+        <!-- Parameters Section -->
+        <section id="parameters-section" class="card" style="display: none;">
+            <h2>Conversion Parameters</h2>
+            <p class="section-description">
+                Adjust the conversion settings for optimal results.
+            </p>
+
+            <div class="parameter-group">
+                <label for="threshold-slider">
+                    Threshold Value: <span id="threshold-value">100</span>
+                </label>
+                <input type="range" id="threshold-slider" min="10" max="1000" value="100" step="10" class="slider">
+                <p class="parameter-description">
+                    Controls tissue density threshold. Higher values = denser tissue only.
+                </p>
+            </div>
+
+            <div class="parameter-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" id="smoothing-checkbox" checked>
+                    <span>Apply Smoothing</span>
+                </label>
+                <p class="parameter-description">
+                    Smooths the 3D model surface for better appearance.
+                </p>
+            </div>
+
+            <div class="parameter-group">
+                <label for="decimation-slider">
+                    Model Simplification: <span id="decimation-value">75</span>%
+                </label>
+                <input type="range" id="decimation-slider" min="10" max="100" value="75" step="5" class="slider">
+                <p class="parameter-description">
+                    Reduces polygon count for smaller file size. Higher = more reduction.
+                </p>
+            </div>
+
+            <button id="convert-btn" class="btn btn-primary">
+                Start Conversion
+            </button>
+        </section>
+
+        <!-- Progress Section -->
+        <section id="progress-section" class="card" style="display: none;">
+            <h2>Conversion Progress</h2>
+
+            <div class="progress-container">
+                <div class="progress-bar">
+                    <div id="progress-fill" class="progress-fill" style="width: 0%"></div>
+                </div>
+                <p id="progress-text" class="progress-text">Initializing...</p>
+                <p id="progress-percent" class="progress-percent">0%</p>
+            </div>
+        </section>
+
+        <!-- Results Section -->
+        <section id="results-section" class="card" style="display: none;">
+            <h2>Conversion Complete!</h2>
+
+            <div class="success-message">
+                <svg class="success-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p id="result-message">Your 3D model has been created successfully!</p>
+            </div>
+
+            <div class="button-group">
+                <button id="view-btn" class="btn btn-primary">
+                    View 3D Model
+                </button>
+                <button id="download-btn" class="btn btn-success">
+                    Download STL
+                </button>
+                <button id="new-conversion-btn" class="btn btn-secondary">
+                    New Conversion
+                </button>
+            </div>
+        </section>
+
+        <!-- 3D Viewer Section -->
+        <section id="viewer-section" class="card viewer-card" style="display: none;">
+            <h2>3D Model Viewer</h2>
+
+            <div id="viewer-container" class="viewer-container">
+                <canvas id="viewer-canvas"></canvas>
+                <div class="viewer-controls">
+                    <p>🖱️ Left click + drag to rotate</p>
+                    <p>🖱️ Right click + drag to pan</p>
+                    <p>🖱️ Scroll to zoom</p>
+                </div>
+            </div>
+
+            <div class="button-group">
+                <button id="reset-camera-btn" class="btn btn-secondary">
+                    Reset Camera
+                </button>
+                <button id="close-viewer-btn" class="btn btn-secondary">
+                    Close Viewer
+                </button>
+            </div>
+        </section>
+
+        <!-- Error Section -->
+        <section id="error-section" class="card error-card" style="display: none;">
+            <h2>Error</h2>
+
+            <div class="error-message">
+                <svg class="error-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p id="error-message-text">An error occurred during conversion.</p>
+            </div>
+
+            <button id="retry-btn" class="btn btn-primary">
+                Try Again
+            </button>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2024 MammoViewer. Powered by <a href="https://www.slicer.org/" target="_blank">3D Slicer</a></p>
+            <p>Sample data: <a href="https://www.cancerimagingarchive.net/" target="_blank">The Cancer Imaging Archive (TCIA)</a></p>
+        </div>
+    </footer>
+
+    <!-- About Modal -->
+    <div id="about-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="modal-close">&times;</span>
+            <h2>About MammoViewer</h2>
+
+            <h3>Features</h3>
+            <ul>
+                <li>Convert mammography DICOM files to 3D printable STL models</li>
+                <li>Adjustable threshold, smoothing, and decimation parameters</li>
+                <li>Real-time 3D preview with Three.js</li>
+                <li>Batch processing support</li>
+            </ul>
+
+            <h3>Data Sources</h3>
+            <p>
+                Test with public mammography datasets from:
+                <br>
+                <a href="https://www.cancerimagingarchive.net/" target="_blank">The Cancer Imaging Archive (TCIA)</a>
+            </p>
+
+            <h3>Technical Details</h3>
+            <ul>
+                <li>Backend: Python, Flask, SimpleITK</li>
+                <li>3D Processing: 3D Slicer</li>
+                <li>Frontend: HTML5, CSS3, JavaScript, Three.js</li>
+                <li>Supported formats: .dcm, .dicom</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Load Three.js addons and app script -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
