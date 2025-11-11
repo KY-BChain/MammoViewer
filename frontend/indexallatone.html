@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MammoViewer - DICOM to STL Converter</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <h1>🏥 MammoViewer</h1>
+                <p class="subtitle">Convert Mammography DICOM Data to 3D STL Models</p>
+            </div>
+        </header>
+
+    <!-- Main Content -->
+        <main class="main-content">
+            <!-- Upload Section -->
+            <section class="card upload-section">
+                <h2>📁 Upload DICOM Files</h2>
+                <p class="section-description">
+                    Upload DICOM mammography files from The Cancer Imaging Archive (TCIA) or other sources.
+                    You can upload single or multiple DICOM files.
+                </p>
+                
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">📤</div>
+                    <p class="upload-text">Drag and drop DICOM files here</p>
+                    <p class="upload-subtext">or</p>
+                    <label for="fileInput" class="btn btn-primary">Choose DICOM Files</label>
+                    <input type="file" id="fileInput" multiple accept=".dcm,.dicom,.DCM,.DICOM" hidden>
+                    <p class="file-info">Supported formats: .dcm, .dicom (Max 100 files, 500MB total)</p>
+                </div>
+
+                <div class="selected-files" id="selectedFiles" style="display: none;">
+                    <h3>Selected Files</h3>
+                    <div class="file-list" id="fileList"></div>
+                    <button class="btn btn-secondary" id="clearFiles">Clear All</button>
+                </div>
+
+                <div class="upload-info" id="uploadInfo" style="display: none;">
+                    <h3>Upload Information</h3>
+                    <div id="uploadDetails"></div>
+                </div>
+            </section>
+
+            <!-- Conversion Parameters -->
+            <section> class="card parameters-section" id="parametersSection" style="display: none;">
+                <h2>⚙️ Conversion Parameters</h2>
+                
+                <div class="parameter-group">
+                    <label for="thresholdSlider">
+                        Segmentation Threshold: <span id="thresholdValue">100</span>
+                    </label>
+                    <input type="range" id="thresholdSlider" min="10" max="1000" value="100" step="10">
+                    <p class="parameter-description">
+                        Adjust the intensity threshold for tissue segmentation. Higher values = denser tissue.
+                    </p>
+                </div>
+
+                <div class="parameter-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="smoothingCheckbox" checked>
+                        Apply Mesh Smoothing
+                    </label>
+                    <p class="parameter-description">
+                        Smooth the 3D mesh to reduce surface roughness.
+                    </p>
+                </div>
+
+                <div class="parameter-group">
+                    <label for="decimationSlider">
+                        Mesh Simplification: <span id="decimationValue">75</span>%
+                    </label>
+                    <input type="range" id="decimationSlider" min="10" max="100" value="75" step="5">
+                    <p class="parameter-description">
+                        Reduce mesh complexity for smaller file size and faster rendering.
+                    </p>
+                </div>
+
+                <button class="btn btn-primary btn-large" id="convertBtn">
+                    🔄 Convert to STL
+                </button>
+            </section>
+
+            <!-- Progress Section -->
+            <section> class="card progress-section" id="progressSection" style="display: none;">
+                <h2>⏳ Processing</h2>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <p class="progress-text" id="progressText">Starting conversion...</p>
+                <div class="progress-details" id="progressDetails"></div>
+            </section>
+
+            <!-- Results Section -->
+            <section> class="card results-section" id="resultsSection" style="display: none;">
+                <h2>✅ Conversion Complete</h2>
+                <p class="success-message">Your DICOM files have been successfully converted to STL format!</p>
+                
+                <div class="result-actions">
+                    <button class="btn btn-primary" id="viewModelBtn">
+                        👁️ View 3D Model
+                    </button>
+                    <button class="btn btn-success" id="downloadBtn">
+                        💾 Download STL File
+                    </button>
+                    <button class="btn btn-secondary" id="newConversionBtn">
+                        🔄 New Conversion
+                    </button>
+                </div>
+
+                <div class="result-info" id="resultInfo"></div>
+            </section>
+
+            <!-- 3D Viewer Section -->
+            <section> class="card viewer-section" id="viewerSection" style="display: none;">
+                <div class="viewer-header">
+                    <h2>🎨 3D Model Viewer</h2>
+                    <button class="btn btn-secondary btn-small" id="closeViewerBtn">Close Viewer</button>
+                </div>
+                
+                <div class="viewer-container">
+                    <div id="viewer3D" class="viewer-canvas"></div>
+                    <div class="viewer-controls">
+                        <p>🖱️ <strong>Mouse Controls:</strong></p>
+                        <ul>
+                            <li>Left Click + Drag: Rotate</li>
+                            <li>Right Click + Drag: Pan</li>
+                            <li>Scroll: Zoom</li>
+                        </ul>
+                        <button class="btn btn-secondary btn-small" id="resetCameraBtn">Reset View</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Error Section -->
+            <section> class="card error-section" id="errorSection" style="display: none;">
+                <h2>❌ Error</h2>
+                <p class="error-message" id="errorMessage"></p>
+                <button class="btn btn-primary" id="retryBtn">Try Again</button>
+            </section>
+    </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="footer-content">
+                <p>Powered by <strong>3D Slicer</strong> and <strong>The Cancer Imaging Archive (TCIA)</strong></p>
+                <p class="footer-links">
+                    <a href="https://www.slicer.org/" target="_blank">3D Slicer</a> |
+                    <a href="https://www.cancerimagingarchive.net/" target="_blank">TCIA</a> |
+                    <a href="#" id="aboutLink">About</a>
+                </p>
+            </div>
+        </footer>
+
+        <!-- About Modal -->
+        <div class="modal" id="aboutModal" style="display: none;">
+            <div class="modal-content">
+                <span class="close-modal" id="closeModal">&times;</span>
+                <h2>About MammoViewer</h2>
+                <p>
+                    This application converts DICOM mammography images to 3D STL models using 
+                    <strong>3D Slicer</strong>, an open-source medical imaging platform.
+                </p>
+                <h3>Features</h3>
+                <ul>
+                    <li>Upload DICOM files from TCIA or local sources</li>
+                    <li>Automatic segmentation and 3D reconstruction</li>
+                    <li>Interactive 3D model visualization</li>
+                    <li>Customizable conversion parameters</li>
+                    <li>Export to STL format for 3D printing or analysis</li>
+                </ul>
+                <h3>Data Sources</h3>
+                <p>
+                    This tool works with mammography DICOM data from:
+                </p>
+                <ul>
+                    <li><a href="https://www.cancerimagingarchive.net/" target="_blank">The Cancer Imaging Archive (TCIA)</a></li>
+                    <li>Local DICOM files from medical imaging systems</li>
+                    <li>Research datasets</li>
+                </ul>
+                <h3>Technical Details</h3>
+                <p>
+                    The conversion process uses <strong>3D Slicer</strong> to:
+                </p>
+                <ol>
+                    <li>Load and validate DICOM series</li>
+                    <li>Apply intensity-based segmentation</li>
+                    <li>Generate 3D surface mesh</li>
+                    <li>Apply smoothing and simplification</li>
+                    <li>Export to STL format</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

@@ -206,7 +206,12 @@ def process_conversion_job(job_id: str, upload_dir: Path, params: dict):
 @app.route('/')
 def index():
     """Serve the main page"""
-    return send_file('../frontend/index.html')
+    return send_from_directory('../frontend', 'index.html')
+
+@app.route('/<path:path>')
+def serve_static(path):
+    """Serve static files (CSS, JS)"""
+    return send_from_directory('../frontend', path)
 
 
 @app.route('/api/health', methods=['GET'])
