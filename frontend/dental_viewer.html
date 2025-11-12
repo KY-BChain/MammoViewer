@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dental 3D Viewer - MammoViewer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            overflow: hidden;
+        }
+
+        .header {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            z-index: 100;
+        }
+
+        h1 {
+            font-size: 24px;
+            color: #2563eb;
+            margin: 0;
+        }
+
+        .subtitle {
+            font-size: 14px;
+            color: #64748b;
+            margin-top: 5px;
+        }
+
+        #viewer {
+            width: 100vw;
+            height: 100vh;
+            display: block;
+        }
+
+        .controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px 25px;
+            border-radius: 50px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            display: flex;
+            gap: 15px;
+        }
+
+        .controls button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 25px;
+            background: #2563eb;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .controls button:hover {
+            background: #1d4ed8;
+            transform: translateY(-2px);
+        }
+
+        .upload-btn {
+            position: absolute;
+            top: 90px;
+            right: 20px;
+            padding: 12px 24px;
+            background: white;
+            border: 2px solid #2563eb;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: 600;
+            color: #2563eb;
+            transition: all 0.3s;
+        }
+
+        .upload-btn:hover {
+            background: #2563eb;
+            color: white;
+        }
+
+        .info-panel {
+            position: absolute;
+            top: 90px;
+            left: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            max-width: 250px;
+        }
+
+        .info-item {
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+
+        .info-label {
+            color: #64748b;
+        }
+
+        .info-value {
+            color: #1e293b;
+            font-weight: 600;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 30px 50px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            display: none;
+        }
+
+        .loading.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🦷 Dental 3D Viewer</h1>
+        <p class="subtitle">Interactive Orthodontic Simulation</p>
+    </div>
+
+    <label for="fileInput" class="upload-btn">📁 Upload STL Model</label>
+    <input type="file" id="fileInput" accept=".stl,.obj,.ply">
+
+    <div class="info-panel" id="infoPanel" style="display: none;">
+        <div class="info-item">
+            <span class="info-label">Vertices:</span>
+            <span class="info-value" id="vertexCount">0</span>
+        </div>
+        <div class="info-item">
+            <span class="info-label">Triangles:</span>
+            <span class="info-value" id="triangleCount">0</span>
+        </div>
+        <div class="info-item">
+            <span class="info-label">File Size:</span>
+            <span class="info-value" id="fileSize">0 KB</span>
+        </div>
+    </div>
+
+    <div id="viewer"></div>
+
+    <div class="controls">
+        <button id="resetBtn">🔄 Reset View</button>
+        <button id="wireframeBtn">🔲 Wireframe</button>
+        <button id="colorBtn">🎨 Color</button>
+        <button id="rotateBtn">⟳ Auto Rotate</button>
+    </div>
+
+    <div class="loading" id="loading">
+        <p>Loading 3D model...</p>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+    <script>
+        let scene, camera, renderer, controls, mesh;
+        let autoRotate = false;
+        let wireframeMode = false;
+        let currentColor = 0xffffff;
+
+        const colors = [0xffffff, 0xff6b9d, 0x00d4ff, 0x7bed9f, 0xffa502];
+        let colorIndex = 0;
+
+        // Initialize scene
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x1a1a2e);
+
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 10000);
+            camera.position.set(0, 0, 300);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            document.getElementById('viewer').appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+
+            // Lights
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+
+            const light1 = new THREE.DirectionalLight(0xffffff, 0.8);
+            light1.position.set(1, 1, 1);
+            scene.add(light1);
+
+            const light2 = new THREE.DirectionalLight(0xffffff, 0.4);
+            light2.position.set(-1, -1, -1);
+            scene.add(light2);
+
+            // Grid
+            const gridHelper = new THREE.GridHelper(200, 20, 0x444444, 0x222222);
+            scene.add(gridHelper);
+
+            animate();
+        }
+
+        // Load STL file
+        document.getElementById('fileInput').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            document.getElementById('loading').classList.add('active');
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const loader = new THREE.STLLoader();
+                const geometry = loader.parse(event.target.result);
+
+                if (mesh) scene.remove(mesh);
+
+                geometry.computeVertexNormals();
+                geometry.center();
+
+                const material = new THREE.MeshPhongMaterial({
+                    color: 0xffffff,
+                    specular: 0x111111,
+                    shininess: 200,
+                    side: THREE.DoubleSide
+                });
+
+                mesh = new THREE.Mesh(geometry, material);
+                scene.add(mesh);
+
+                // Update info
+                const vertices = geometry.attributes.position.count;
+                document.getElementById('vertexCount').textContent = vertices.toLocaleString();
+                document.getElementById('triangleCount').textContent = (vertices / 3).toLocaleString();
+                document.getElementById('fileSize').textContent = (file.size / 1024).toFixed(2) + ' KB';
+                document.getElementById('infoPanel').style.display = 'block';
+
+                // Fit camera
+                fitCameraToObject();
+
+                document.getElementById('loading').classList.remove('active');
+            };
+
+            reader.readAsArrayBuffer(file);
+        });
+
+        function fitCameraToObject() {
+            const box = new THREE.Box3().setFromObject(mesh);
+            const size = box.getSize(new THREE.Vector3());
+            const center = box.getCenter(new THREE.Vector3());
+
+            const maxDim = Math.max(size.x, size.y, size.z);
+            const fov = camera.fov * (Math.PI / 180);
+            let cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2));
+            cameraZ *= 1.8;
+
+            camera.position.set(center.x, center.y, center.z + cameraZ);
+            camera.lookAt(center);
+            controls.target.copy(center);
+        }
+
+        // Controls
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            if (mesh) fitCameraToObject();
+        });
+
+        document.getElementById('wireframeBtn').addEventListener('click', () => {
+            if (mesh) {
+                wireframeMode = !wireframeMode;
+                mesh.material.wireframe = wireframeMode;
+            }
+        });
+
+        document.getElementById('colorBtn').addEventListener('click', () => {
+            if (mesh) {
+                colorIndex = (colorIndex + 1) % colors.length;
+                mesh.material.color.setHex(colors[colorIndex]);
+            }
+        });
+
+        document.getElementById('rotateBtn').addEventListener('click', () => {
+            autoRotate = !autoRotate;
+        });
+
+        // Animation
+        function animate() {
+            requestAnimationFrame(animate);
+
+            if (autoRotate && mesh) {
+                mesh.rotation.y += 0.005;
+            }
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        // Resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        init();
+    </script>
+</body>
+</html>
