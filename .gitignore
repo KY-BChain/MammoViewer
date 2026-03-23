@@ -78,6 +78,8 @@ coverage.xml
 
 # Documentation builds
 docs/_build/
+.docx
+.zip
 
 # Jupyter Notebook
 .ipynb_checkpoints

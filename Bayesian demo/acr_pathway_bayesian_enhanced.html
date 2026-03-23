@@ -1,0 +1,1400 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>ACR临床决策支持系统 - 乳腺癌诊疗 (Bayesian Enhanced)</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', sans-serif, Arial; background: #f5f7fa; }
+        
+        .cds-container {
+            max-width: 1600px;
+            margin: 20px auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+            overflow: hidden;
+        }
+        
+        .cds-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header-left h1 { font-size: 28px; margin-bottom: 8px; }
+        .header-left p { font-size: 14px; opacity: 0.9; }
+        
+        .header-right {
+            text-align: right;
+        }
+        
+        .system-badge {
+            background: rgba(255,255,255,0.2);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            display: inline-block;
+            margin-bottom: 5px;
+        }
+        
+        .patient-selector {
+            padding: 20px 30px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .patient-selector select,
+        .patient-selector input {
+            flex: 1;
+            min-width: 200px;
+            padding: 10px 15px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        
+        .btn-generate {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-generate:hover { background: #218838; transform: translateY(-1px); }
+        
+        .btn-reset {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-reset:hover { background: #5a6268; }
+        
+        .results-container {
+            padding: 30px;
+            display: none;
+        }
+        
+        .results-container.active {
+            display: block;
+        }
+        
+        /* Bayesian Probability Panel */
+        .bayesian-panel {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 8px;
+            padding: 25px;
+            margin-bottom: 20px;
+        }
+        
+        .bayesian-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .prob-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        
+        .prob-item {
+            background: rgba(255,255,255,0.15);
+            padding: 15px;
+            border-radius: 8px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .prob-label {
+            font-size: 12px;
+            opacity: 0.9;
+            margin-bottom: 5px;
+        }
+        
+        .prob-value {
+            font-size: 28px;
+            font-weight: 700;
+        }
+        
+        .prob-bar {
+            height: 8px;
+            background: rgba(255,255,255,0.3);
+            border-radius: 4px;
+            margin-top: 8px;
+            overflow: hidden;
+        }
+        
+        .prob-fill {
+            height: 100%;
+            background: white;
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+        
+        /* Alert System */
+        .alert-panel {
+            margin-bottom: 20px;
+            border-radius: 8px;
+            padding: 20px;
+            border-left: 4px solid;
+        }
+        
+        .alert-critical {
+            background: #fff5f5;
+            border-left-color: #e53e3e;
+        }
+        
+        .alert-high {
+            background: #fffaf0;
+            border-left-color: #dd6b20;
+        }
+        
+        .alert-info {
+            background: #ebf8ff;
+            border-left-color: #3182ce;
+        }
+        
+        .alert-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        /* Patient Summary Card */
+        .patient-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .summary-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 3px solid #667eea;
+        }
+        
+        .summary-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        
+        .summary-value {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        /* Biomarker Display */
+        .biomarker-panel {
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .panel-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #333;
+        }
+        
+        .biomarker-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .biomarker-item {
+            text-align: center;
+            padding: 15px;
+            border-radius: 6px;
+            background: #f8f9fa;
+        }
+        
+        .biomarker-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        
+        .biomarker-value {
+            font-size: 24px;
+            font-weight: bold;
+        }
+        
+        .positive { color: #e53e3e; }
+        .negative { color: #48bb78; }
+        
+        .molecular-subtype {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        
+        .subtype-luminalA { background: #bee3f8; color: #2c5282; }
+        .subtype-luminalB { background: #feebc8; color: #7c2d12; }
+        .subtype-her2 { background: #fed7d7; color: #742a2a; }
+        .subtype-tnbc { background: #e9d8fd; color: #44337a; }
+        
+        /* Treatment Recommendations */
+        .treatment-panel {
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .treatment-card {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+        }
+        
+        .treatment-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .treatment-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .guideline-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .guideline-csco { background: #bee3f8; color: #2c5282; }
+        .guideline-nccn { background: #c6f6d5; color: #22543d; }
+        .guideline-caca { background: #fed7d7; color: #742a2a; }
+        .guideline-bayesian { background: #e9d8fd; color: #44337a; }
+        
+        .level-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+        
+        .level-I { background: #48bb78; color: white; }
+        .level-II { background: #ed8936; color: white; }
+        .level-III { background: #a0aec0; color: white; }
+        
+        .response-prob {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 8px;
+            background: #faf089;
+            color: #744210;
+        }
+        
+        .regimen-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        
+        .regimen-table th {
+            text-align: left;
+            padding: 8px;
+            background: #e2e8f0;
+            font-size: 12px;
+            color: #4a5568;
+        }
+        
+        .regimen-table td {
+            padding: 8px;
+            border-top: 1px solid #e2e8f0;
+            font-size: 14px;
+        }
+        
+        /* Reasoning Chain */
+        .reasoning-panel {
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .reasoning-step {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 6px;
+        }
+        
+        .step-number {
+            flex-shrink: 0;
+            width: 32px;
+            height: 32px;
+            background: #667eea;
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+        }
+        
+        .step-content {
+            flex: 1;
+        }
+        
+        .step-title {
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #333;
+        }
+        
+        .step-description {
+            font-size: 14px;
+            color: #666;
+        }
+        
+        /* Confidence Meter */
+        .confidence-panel {
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .confidence-meter {
+            position: relative;
+            height: 30px;
+            background: #e2e8f0;
+            border-radius: 15px;
+            overflow: hidden;
+            margin: 15px 0;
+        }
+        
+        .confidence-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #48bb78, #667eea);
+            border-radius: 15px;
+            transition: width 0.5s ease;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 15px;
+        }
+        
+        .confidence-score {
+            color: white;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        
+        /* Action Buttons */
+        .action-panel {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+        
+        .action-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .btn-approve {
+            background: #48bb78;
+            color: white;
+        }
+        
+        .btn-approve:hover {
+            background: #38a169;
+        }
+        
+        .btn-modify {
+            background: #ed8936;
+            color: white;
+        }
+        
+        .btn-modify:hover {
+            background: #dd6b20;
+        }
+        
+        .btn-reject {
+            background: #e53e3e;
+            color: white;
+        }
+        
+        .btn-reject:hover {
+            background: #c53030;
+        }
+        
+        .btn-print {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-print:hover {
+            background: #5a67d8;
+        }
+        
+        /* Loading Spinner */
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 40px;
+        }
+        
+        .loading.active {
+            display: block;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Responsive */
+        @media (max-width: 768px) {
+            .patient-summary {
+                grid-template-columns: 1fr;
+            }
+            
+            .biomarker-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .prob-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        @media print {
+            .patient-selector,
+            .action-panel {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="cds-container">
+        <!-- Header -->
+        <div class="cds-header">
+            <div class="header-left">
+                <h1>🧬 ACR临床决策支持系统 AI Clinical Decision Support System</h1>
+                <p>乳腺癌智能诊疗推荐引擎 - Breast Cancer Treatment Recommendation Engine</p>
+            </div>
+            <div class="header-right">
+                <div class="system-badge">🤖 Bayesian AI Powered</div>
+                <div class="system-badge">🧠 Ontology Reasoner</div>
+                <div style="font-size: 12px; margin-top: 5px;">Version 2.0.0 | Build 2025-11-11</div>
+            </div>
+        </div>
+
+        <!-- Patient Input Section -->
+        <div class="patient-selector">
+            <input type="number" id="patientAge" placeholder="患者年龄 Age" min="18" max="100">
+            <input type="number" id="tumorSize" placeholder="肿瘤大小(mm) Tumor Size" min="1" max="200" step="0.1">
+            
+            <select id="erStatus">
+                <option value="">ER状态 ER Status</option>
+                <option value="Positive">阳性 Positive</option>
+                <option value="Negative">阴性 Negative</option>
+            </select>
+            
+            <input type="number" id="erPercent" placeholder="ER% (0-100)" min="0" max="100">
+            
+            <select id="prStatus">
+                <option value="">PR状态 PR Status</option>
+                <option value="Positive">阳性 Positive</option>
+                <option value="Negative">阴性 Negative</option>
+            </select>
+            
+            <input type="number" id="prPercent" placeholder="PR% (0-100)" min="0" max="100">
+            
+            <select id="her2Status">
+                <option value="">HER2状态 HER2 Status</option>
+                <option value="Positive">阳性 Positive</option>
+                <option value="Negative">阴性 Negative</option>
+            </select>
+            
+            <input type="number" id="ki67Index" placeholder="Ki67指数 Ki67 Index (%)" min="0" max="100" step="0.1">
+            
+            <select id="clinicalStage">
+                <option value="">临床分期 Clinical Stage</option>
+                <option value="I">Stage I</option>
+                <option value="IIA">Stage IIA</option>
+                <option value="IIB">Stage IIB</option>
+                <option value="IIIA">Stage IIIA</option>
+                <option value="IIIB">Stage IIIB</option>
+                <option value="IIIC">Stage IIIC</option>
+                <option value="IV">Stage IV</option>
+            </select>
+            
+            <select id="lymphNode">
+                <option value="">淋巴结 Lymph Node</option>
+                <option value="N0">N0 (无)</option>
+                <option value="N1">N1 (1-3)</option>
+                <option value="N2">N2 (4-9)</option>
+                <option value="N3">N3 (≥10)</option>
+            </select>
+            
+            <select id="histoGrade">
+                <option value="">组织学分级 Grade</option>
+                <option value="I">Grade I</option>
+                <option value="II">Grade II</option>
+                <option value="III">Grade III</option>
+            </select>
+            
+            <label style="display: flex; align-items: center; gap: 5px;">
+                <input type="checkbox" id="familyHistory">
+                <span>家族史 Family History</span>
+            </label>
+            
+            <button class="btn-generate" onclick="generateRecommendations()">
+                🎯 生成智能推荐 Generate AI Recommendations
+            </button>
+            
+            <button class="btn-reset" onclick="resetForm()">
+                🔄 重置 Reset
+            </button>
+        </div>
+
+        <!-- Loading Indicator -->
+        <div class="loading" id="loadingIndicator">
+            <div class="spinner"></div>
+            <p>正在进行贝叶斯分析和本体推理...</p>
+            <p>Running Bayesian Analysis and Ontology Reasoning...</p>
+        </div>
+
+        <!-- Results Container -->
+        <div class="results-container" id="resultsContainer">
+            <!-- Bayesian Probability Panel -->
+            <div class="bayesian-panel">
+                <div class="bayesian-title">
+                    📊 贝叶斯概率分析 Bayesian Probability Analysis
+                </div>
+                <div class="prob-grid">
+                    <div class="prob-item">
+                        <div class="prob-label">癌症概率 Cancer Probability</div>
+                        <div class="prob-value" id="cancerProb">0%</div>
+                        <div class="prob-bar">
+                            <div class="prob-fill" id="cancerProbBar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="prob-item">
+                        <div class="prob-label">5年复发风险 5-Year Recurrence Risk</div>
+                        <div class="prob-value" id="recurrenceRisk">0%</div>
+                        <div class="prob-bar">
+                            <div class="prob-fill" id="recurrenceRiskBar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="prob-item">
+                        <div class="prob-label">内分泌治疗应答率 Hormone Therapy Response</div>
+                        <div class="prob-value" id="hormoneResponse">0%</div>
+                        <div class="prob-bar">
+                            <div class="prob-fill" id="hormoneResponseBar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="prob-item">
+                        <div class="prob-label">化疗应答率 Chemotherapy Response</div>
+                        <div class="prob-value" id="chemoResponse">0%</div>
+                        <div class="prob-bar">
+                            <div class="prob-fill" id="chemoResponseBar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Alerts Section -->
+            <div id="alertsSection"></div>
+
+            <!-- Patient Summary -->
+            <div class="patient-summary">
+                <div class="summary-card">
+                    <div class="summary-label">患者信息 Patient Info</div>
+                    <div class="summary-value" id="patientInfo">--</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-label">临床分期 Clinical Stage</div>
+                    <div class="summary-value" id="stageSummary">--</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-label">分子分型 Molecular Subtype</div>
+                    <div id="molecularSubtype">--</div>
+                </div>
+                <div class="summary-card">
+                    <div class="summary-label">风险分层 Risk Level</div>
+                    <div class="summary-value" id="riskLevel">--</div>
+                </div>
+            </div>
+
+            <!-- Biomarkers Panel -->
+            <div class="biomarker-panel">
+                <div class="panel-title">🧪 生物标志物 Biomarkers</div>
+                <div class="biomarker-grid">
+                    <div class="biomarker-item">
+                        <div class="biomarker-label">ER</div>
+                        <div class="biomarker-value" id="erDisplay">--</div>
+                    </div>
+                    <div class="biomarker-item">
+                        <div class="biomarker-label">PR</div>
+                        <div class="biomarker-value" id="prDisplay">--</div>
+                    </div>
+                    <div class="biomarker-item">
+                        <div class="biomarker-label">HER2</div>
+                        <div class="biomarker-value" id="her2Display">--</div>
+                    </div>
+                    <div class="biomarker-item">
+                        <div class="biomarker-label">Ki67</div>
+                        <div class="biomarker-value" id="ki67Display">--</div>
+                    </div>
+                    <div class="biomarker-item">
+                        <div class="biomarker-label">组织学分级 Grade</div>
+                        <div class="biomarker-value" id="gradeDisplay">--</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Treatment Recommendations -->
+            <div class="treatment-panel">
+                <div class="panel-title">💊 治疗推荐 Treatment Recommendations</div>
+                <div id="treatmentCards"></div>
+            </div>
+
+            <!-- Reasoning Chain -->
+            <div class="reasoning-panel">
+                <div class="panel-title">🧠 推理链 Reasoning Chain (Bayesian + Ontology)</div>
+                <div id="reasoningSteps"></div>
+            </div>
+
+            <!-- Confidence Meter -->
+            <div class="confidence-panel">
+                <div class="panel-title">✅ 置信度评估 Confidence Assessment</div>
+                <div class="confidence-meter">
+                    <div class="confidence-fill" id="confidenceFill" style="width: 0%">
+                        <span class="confidence-score" id="confidenceScore">0%</span>
+                    </div>
+                </div>
+                <p id="confidenceText" style="text-align: center; color: #666; font-size: 14px;"></p>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="action-panel">
+                <button class="action-btn btn-approve" onclick="approveRecommendation()">
+                    ✅ 批准方案 Approve
+                </button>
+                <button class="action-btn btn-modify" onclick="modifyRecommendation()">
+                    ✏️ 修改方案 Modify
+                </button>
+                <button class="action-btn btn-reject" onclick="rejectRecommendation()">
+                    ❌ 拒绝方案 Reject
+                </button>
+                <button class="action-btn btn-print" onclick="printRecommendation()">
+                    🖨️ 打印报告 Print Report
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ===============================================
+        // EMBEDDED BAYESIAN REASONING ENGINE
+        // ===============================================
+        
+        class BayesianEngine {
+            constructor() {
+                this.baseRates = {
+                    ageGroups: {
+                        '40-49': 0.0147,
+                        '50-59': 0.0237,
+                        '60-69': 0.0342,
+                        '70+': 0.0372
+                    },
+                    subtypes: {
+                        'Luminal A': 0.40,
+                        'Luminal B (HER2-)': 0.20,
+                        'Luminal B (HER2+)': 0.10,
+                        'HER2-enriched': 0.15,
+                        'Triple-negative': 0.15
+                    }
+                };
+                
+                this.treatmentResponses = {
+                    'Luminal A': {
+                        hormone: 0.80,
+                        chemo: 0.50,
+                        her2: 0.0
+                    },
+                    'Luminal B (HER2-)': {
+                        hormone: 0.70,
+                        chemo: 0.65,
+                        her2: 0.0
+                    },
+                    'Luminal B (HER2+)': {
+                        hormone: 0.70,
+                        chemo: 0.75,
+                        her2: 0.85
+                    },
+                    'HER2-enriched': {
+                        hormone: 0.10,
+                        chemo: 0.80,
+                        her2: 0.90
+                    },
+                    'Triple-negative': {
+                        hormone: 0.05,
+                        chemo: 0.75,
+                        her2: 0.0
+                    }
+                };
+            }
+            
+            calculateCancerProbability(age, familyHistory) {
+                let prior = 0.01;
+                
+                if (age >= 40 && age < 50) prior = this.baseRates.ageGroups['40-49'];
+                else if (age >= 50 && age < 60) prior = this.baseRates.ageGroups['50-59'];
+                else if (age >= 60 && age < 70) prior = this.baseRates.ageGroups['60-69'];
+                else if (age >= 70) prior = this.baseRates.ageGroups['70+'];
+                
+                if (familyHistory) {
+                    prior = this.bayesUpdate(prior, 2.1);
+                }
+                
+                return prior;
+            }
+            
+            classifySubtype(er, pr, her2, ki67) {
+                let probabilities = {...this.baseRates.subtypes};
+                
+                // Apply Bayesian updates based on biomarkers
+                if (er === 'Positive') {
+                    probabilities['Luminal A'] *= 0.95;
+                    probabilities['Luminal B (HER2-)'] *= 0.90;
+                    probabilities['Luminal B (HER2+)'] *= 0.90;
+                    probabilities['HER2-enriched'] *= 0.20;
+                    probabilities['Triple-negative'] *= 0.01;
+                } else {
+                    probabilities['Luminal A'] *= 0.05;
+                    probabilities['Luminal B (HER2-)'] *= 0.10;
+                    probabilities['Luminal B (HER2+)'] *= 0.10;
+                    probabilities['HER2-enriched'] *= 0.80;
+                    probabilities['Triple-negative'] *= 1.0;
+                }
+                
+                if (pr === 'Positive') {
+                    probabilities['Luminal A'] *= 0.90;
+                    probabilities['Luminal B (HER2-)'] *= 0.80;
+                    probabilities['Luminal B (HER2+)'] *= 0.80;
+                    probabilities['HER2-enriched'] *= 0.15;
+                    probabilities['Triple-negative'] *= 0.01;
+                } else {
+                    probabilities['Luminal A'] *= 0.10;
+                    probabilities['Luminal B (HER2-)'] *= 0.20;
+                    probabilities['Luminal B (HER2+)'] *= 0.20;
+                    probabilities['HER2-enriched'] *= 0.85;
+                    probabilities['Triple-negative'] *= 1.0;
+                }
+                
+                if (her2 === 'Positive') {
+                    probabilities['Luminal A'] *= 0.05;
+                    probabilities['Luminal B (HER2-)'] *= 0.01;
+                    probabilities['Luminal B (HER2+)'] *= 0.95;
+                    probabilities['HER2-enriched'] *= 0.95;
+                    probabilities['Triple-negative'] *= 0.01;
+                } else {
+                    probabilities['Luminal A'] *= 0.95;
+                    probabilities['Luminal B (HER2-)'] *= 0.99;
+                    probabilities['Luminal B (HER2+)'] *= 0.05;
+                    probabilities['HER2-enriched'] *= 0.05;
+                    probabilities['Triple-negative'] *= 0.99;
+                }
+                
+                if (ki67 !== null && ki67 !== '') {
+                    if (ki67 > 14) {
+                        probabilities['Luminal A'] *= 0.10;
+                        probabilities['Luminal B (HER2-)'] *= 0.90;
+                        probabilities['Luminal B (HER2+)'] *= 0.90;
+                        probabilities['HER2-enriched'] *= 0.85;
+                        probabilities['Triple-negative'] *= 0.90;
+                    } else {
+                        probabilities['Luminal A'] *= 0.90;
+                        probabilities['Luminal B (HER2-)'] *= 0.10;
+                        probabilities['Luminal B (HER2+)'] *= 0.10;
+                        probabilities['HER2-enriched'] *= 0.15;
+                        probabilities['Triple-negative'] *= 0.10;
+                    }
+                }
+                
+                // Normalize
+                const total = Object.values(probabilities).reduce((a, b) => a + b, 0);
+                for (let key in probabilities) {
+                    probabilities[key] /= total;
+                }
+                
+                // Find max
+                let maxSubtype = null;
+                let maxProb = 0;
+                for (let key in probabilities) {
+                    if (probabilities[key] > maxProb) {
+                        maxProb = probabilities[key];
+                        maxSubtype = key;
+                    }
+                }
+                
+                return {subtype: maxSubtype, probabilities: probabilities, confidence: maxProb};
+            }
+            
+            estimateRecurrenceRisk(subtype, tumorSize, lymphNode, grade) {
+                let baseRisk = {
+                    'Luminal A': 0.10,
+                    'Luminal B (HER2-)': 0.15,
+                    'Luminal B (HER2+)': 0.20,
+                    'HER2-enriched': 0.25,
+                    'Triple-negative': 0.30
+                }[subtype] || 0.20;
+                
+                if (tumorSize > 50) baseRisk *= 1.5;
+                else if (tumorSize > 20) baseRisk *= 1.2;
+                
+                if (lymphNode === 'N3') baseRisk *= 2.0;
+                else if (lymphNode === 'N2') baseRisk *= 1.6;
+                else if (lymphNode === 'N1') baseRisk *= 1.3;
+                
+                if (grade === 'III') baseRisk *= 1.4;
+                else if (grade === 'I') baseRisk *= 0.7;
+                
+                return Math.min(baseRisk, 0.80);
+            }
+            
+            getTreatmentResponses(subtype) {
+                return this.treatmentResponses[subtype] || {hormone: 0.3, chemo: 0.5, her2: 0.0};
+            }
+            
+            bayesUpdate(prior, likelihoodRatio) {
+                return (likelihoodRatio * prior) / (likelihoodRatio * prior + (1 - prior));
+            }
+        }
+        
+        // ===============================================
+        // EMBEDDED ONTOLOGY REASONER
+        // ===============================================
+        
+        class OntologyReasoner {
+            constructor() {
+                this.rules = this.initializeRules();
+            }
+            
+            initializeRules() {
+                return {
+                    // Molecular Subtype Rules (SWRL-style)
+                    subtypeClassification: [
+                        {
+                            name: 'Luminal A Rule',
+                            condition: (patient) => {
+                                return patient.er === 'Positive' && 
+                                       patient.pr === 'Positive' && 
+                                       patient.her2 === 'Negative' && 
+                                       (patient.ki67 === null || patient.ki67 < 14);
+                            },
+                            conclusion: 'Luminal A'
+                        },
+                        {
+                            name: 'Luminal B (HER2-) Rule',
+                            condition: (patient) => {
+                                return patient.er === 'Positive' && 
+                                       patient.her2 === 'Negative' && 
+                                       (patient.ki67 >= 14 || patient.pr === 'Negative');
+                            },
+                            conclusion: 'Luminal B (HER2-)'
+                        },
+                        {
+                            name: 'Luminal B (HER2+) Rule',
+                            condition: (patient) => {
+                                return patient.er === 'Positive' && patient.her2 === 'Positive';
+                            },
+                            conclusion: 'Luminal B (HER2+)'
+                        },
+                        {
+                            name: 'HER2-enriched Rule',
+                            condition: (patient) => {
+                                return patient.er === 'Negative' && 
+                                       patient.pr === 'Negative' && 
+                                       patient.her2 === 'Positive';
+                            },
+                            conclusion: 'HER2-enriched'
+                        },
+                        {
+                            name: 'Triple-negative Rule',
+                            condition: (patient) => {
+                                return patient.er === 'Negative' && 
+                                       patient.pr === 'Negative' && 
+                                       patient.her2 === 'Negative';
+                            },
+                            conclusion: 'Triple-negative'
+                        }
+                    ],
+                    
+                    // Treatment Recommendation Rules
+                    treatmentRules: [
+                        {
+                            name: 'Hormone Therapy Rule',
+                            condition: (patient) => patient.er === 'Positive',
+                            treatment: 'Hormone Therapy',
+                            medications: ['Tamoxifen', 'Anastrozole', 'Letrozole'],
+                            rationale: 'ER阳性肿瘤对内分泌治疗敏感 ER+ tumors respond to hormone therapy'
+                        },
+                        {
+                            name: 'HER2-targeted Therapy Rule',
+                            condition: (patient) => patient.her2 === 'Positive',
+                            treatment: 'HER2-targeted Therapy',
+                            medications: ['Trastuzumab', 'Pertuzumab', 'T-DM1'],
+                            rationale: 'HER2阳性肿瘤需要抗HER2治疗 HER2+ tumors require anti-HER2 therapy'
+                        },
+                        {
+                            name: 'Chemotherapy for TNBC Rule',
+                            condition: (patient) => {
+                                return patient.er === 'Negative' && 
+                                       patient.pr === 'Negative' && 
+                                       patient.her2 === 'Negative';
+                            },
+                            treatment: 'Chemotherapy',
+                            medications: ['Anthracyclines', 'Taxanes', 'Platinum'],
+                            rationale: '三阴性乳腺癌的主要治疗手段 Primary treatment for TNBC'
+                        },
+                        {
+                            name: 'Chemotherapy for High Risk Rule',
+                            condition: (patient) => {
+                                return patient.tumorSize > 20 || 
+                                       ['N2', 'N3'].includes(patient.lymphNode) ||
+                                       patient.grade === 'III';
+                            },
+                            treatment: 'Chemotherapy',
+                            medications: ['AC-T', 'TAC', 'TC'],
+                            rationale: '高危患者需要化疗 High-risk patients require chemotherapy'
+                        }
+                    ],
+                    
+                    // Risk Stratification Rules
+                    riskRules: [
+                        {
+                            name: 'Low Risk Rule',
+                            condition: (patient) => {
+                                return patient.tumorSize < 20 && 
+                                       patient.lymphNode === 'N0' && 
+                                       patient.grade !== 'III';
+                            },
+                            risk: 'Low Risk'
+                        },
+                        {
+                            name: 'High Risk Rule',
+                            condition: (patient) => {
+                                return patient.tumorSize > 50 || 
+                                       ['N2', 'N3'].includes(patient.lymphNode) ||
+                                       (patient.er === 'Negative' && patient.pr === 'Negative' && patient.her2 === 'Negative');
+                            },
+                            risk: 'High Risk'
+                        },
+                        {
+                            name: 'Intermediate Risk Rule',
+                            condition: (patient) => true, // Default
+                            risk: 'Intermediate Risk'
+                        }
+                    ]
+                };
+            }
+            
+            reason(patient) {
+                const results = {
+                    subtype: null,
+                    treatments: [],
+                    riskLevel: null,
+                    reasoningSteps: []
+                };
+                
+                // Classify subtype using ontology rules
+                for (let rule of this.rules.subtypeClassification) {
+                    if (rule.condition(patient)) {
+                        results.subtype = rule.conclusion;
+                        results.reasoningSteps.push({
+                            title: `分子分型推理 Subtype Classification: ${rule.name}`,
+                            description: `根据生物标志物特征，判定为${rule.conclusion} Based on biomarker profile, classified as ${rule.conclusion}`
+                        });
+                        break;
+                    }
+                }
+                
+                // Determine treatments
+                for (let rule of this.rules.treatmentRules) {
+                    if (rule.condition(patient)) {
+                        results.treatments.push({
+                            name: rule.treatment,
+                            medications: rule.medications,
+                            rationale: rule.rationale,
+                            rule: rule.name
+                        });
+                        results.reasoningSteps.push({
+                            title: `治疗推荐推理 Treatment Recommendation: ${rule.name}`,
+                            description: rule.rationale
+                        });
+                    }
+                }
+                
+                // Determine risk level
+                for (let rule of this.rules.riskRules) {
+                    if (rule.condition(patient)) {
+                        results.riskLevel = rule.risk;
+                        results.reasoningSteps.push({
+                            title: `风险分层推理 Risk Stratification: ${rule.name}`,
+                            description: `评估为${rule.risk} Assessed as ${rule.risk}`
+                        });
+                        break;
+                    }
+                }
+                
+                return results;
+            }
+        }
+        
+        // ===============================================
+        // MAIN APPLICATION LOGIC
+        // ===============================================
+        
+        const bayesianEngine = new BayesianEngine();
+        const ontologyReasoner = new OntologyReasoner();
+        
+        function generateRecommendations() {
+            // Show loading
+            document.getElementById('loadingIndicator').classList.add('active');
+            document.getElementById('resultsContainer').classList.remove('active');
+            
+            // Simulate processing delay
+            setTimeout(() => {
+                performAnalysis();
+                document.getElementById('loadingIndicator').classList.remove('active');
+                document.getElementById('resultsContainer').classList.add('active');
+            }, 1500);
+        }
+        
+        function performAnalysis() {
+            // Collect patient data
+            const patient = {
+                age: parseInt(document.getElementById('patientAge').value) || 50,
+                tumorSize: parseFloat(document.getElementById('tumorSize').value) || null,
+                er: document.getElementById('erStatus').value,
+                erPercent: parseFloat(document.getElementById('erPercent').value) || null,
+                pr: document.getElementById('prStatus').value,
+                prPercent: parseFloat(document.getElementById('prPercent').value) || null,
+                her2: document.getElementById('her2Status').value,
+                ki67: parseFloat(document.getElementById('ki67Index').value) || null,
+                stage: document.getElementById('clinicalStage').value,
+                lymphNode: document.getElementById('lymphNode').value,
+                grade: document.getElementById('histoGrade').value,
+                familyHistory: document.getElementById('familyHistory').checked
+            };
+            
+            // Bayesian Analysis
+            const cancerProb = bayesianEngine.calculateCancerProbability(patient.age, patient.familyHistory);
+            const subtypeResult = bayesianEngine.classifySubtype(patient.er, patient.pr, patient.her2, patient.ki67);
+            const recurrenceRisk = bayesianEngine.estimateRecurrenceRisk(
+                subtypeResult.subtype, patient.tumorSize, patient.lymphNode, patient.grade
+            );
+            const treatmentResponses = bayesianEngine.getTreatmentResponses(subtypeResult.subtype);
+            
+            // Ontology Reasoning
+            const ontologyResults = ontologyReasoner.reason(patient);
+            
+            // Display results
+            displayBayesianResults(cancerProb, recurrenceRisk, treatmentResponses);
+            displayPatientSummary(patient, ontologyResults.subtype || subtypeResult.subtype, ontologyResults.riskLevel);
+            displayBiomarkers(patient);
+            displayTreatments(ontologyResults.treatments, treatmentResponses);
+            displayReasoning(ontologyResults.reasoningSteps, subtypeResult);
+            displayConfidence(calculateConfidence(patient));
+            displayAlerts(patient, cancerProb, recurrenceRisk);
+        }
+        
+        function displayBayesianResults(cancerProb, recurrenceRisk, responses) {
+            document.getElementById('cancerProb').textContent = (cancerProb * 100).toFixed(1) + '%';
+            document.getElementById('cancerProbBar').style.width = (cancerProb * 100) + '%';
+            
+            document.getElementById('recurrenceRisk').textContent = (recurrenceRisk * 100).toFixed(1) + '%';
+            document.getElementById('recurrenceRiskBar').style.width = (recurrenceRisk * 100) + '%';
+            
+            document.getElementById('hormoneResponse').textContent = (responses.hormone * 100).toFixed(1) + '%';
+            document.getElementById('hormoneResponseBar').style.width = (responses.hormone * 100) + '%';
+            
+            document.getElementById('chemoResponse').textContent = (responses.chemo * 100).toFixed(1) + '%';
+            document.getElementById('chemoResponseBar').style.width = (responses.chemo * 100) + '%';
+        }
+        
+        function displayPatientSummary(patient, subtype, riskLevel) {
+            document.getElementById('patientInfo').textContent = `${patient.age}岁 ${patient.age} years`;
+            document.getElementById('stageSummary').textContent = patient.stage || '--';
+            
+            const subtypeEl = document.getElementById('molecularSubtype');
+            const subtypeClass = getSubtypeClass(subtype);
+            subtypeEl.innerHTML = `<span class="molecular-subtype subtype-${subtypeClass}">${subtype}</span>`;
+            
+            document.getElementById('riskLevel').textContent = riskLevel || '--';
+        }
+        
+        function displayBiomarkers(patient) {
+            document.getElementById('erDisplay').textContent = patient.er || '--';
+            document.getElementById('erDisplay').className = 
+                `biomarker-value ${patient.er === 'Positive' ? 'positive' : 'negative'}`;
+            
+            document.getElementById('prDisplay').textContent = patient.pr || '--';
+            document.getElementById('prDisplay').className = 
+                `biomarker-value ${patient.pr === 'Positive' ? 'positive' : 'negative'}`;
+            
+            document.getElementById('her2Display').textContent = patient.her2 || '--';
+            document.getElementById('her2Display').className = 
+                `biomarker-value ${patient.her2 === 'Positive' ? 'positive' : 'negative'}`;
+            
+            document.getElementById('ki67Display').textContent = 
+                patient.ki67 !== null ? patient.ki67 + '%' : '--';
+            
+            document.getElementById('gradeDisplay').textContent = patient.grade || '--';
+        }
+        
+        function displayTreatments(treatments, responses) {
+            const container = document.getElementById('treatmentCards');
+            container.innerHTML = '';
+            
+            treatments.forEach((treatment, index) => {
+                const responseProb = treatment.name.includes('Hormone') ? responses.hormone :
+                                   treatment.name.includes('HER2') ? responses.her2 : responses.chemo;
+                
+                const card = document.createElement('div');
+                card.className = 'treatment-card';
+                card.innerHTML = `
+                    <div class="treatment-header">
+                        <div class="treatment-title">${index + 1}. ${treatment.name}</div>
+                        <div>
+                            <span class="guideline-badge guideline-bayesian">Bayesian AI</span>
+                            <span class="guideline-badge guideline-csco">CSCO</span>
+                            <span class="response-prob">应答率 ${(responseProb * 100).toFixed(0)}%</span>
+                        </div>
+                    </div>
+                    <p style="color: #666; font-size: 14px; margin-bottom: 10px;">
+                        ${treatment.rationale}
+                    </p>
+                    <div style="margin-top: 10px;">
+                        <strong>推荐药物 Recommended Medications:</strong>
+                        ${treatment.medications.map(med => 
+                            `<span style="display: inline-block; background: #e2e8f0; padding: 4px 12px; 
+                                   border-radius: 12px; margin: 4px; font-size: 13px;">${med}</span>`
+                        ).join('')}
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+        
+        function displayReasoning(steps, subtypeResult) {
+            const container = document.getElementById('reasoningSteps');
+            container.innerHTML = '';
+            
+            // Add Bayesian subtype probabilities
+            const bayesianStep = document.createElement('div');
+            bayesianStep.className = 'reasoning-step';
+            bayesianStep.innerHTML = `
+                <div class="step-number">📊</div>
+                <div class="step-content">
+                    <div class="step-title">贝叶斯分子分型概率 Bayesian Subtype Probabilities</div>
+                    <div class="step-description">
+                        ${Object.entries(subtypeResult.probabilities)
+                            .map(([subtype, prob]) => `${subtype}: ${(prob * 100).toFixed(1)}%`)
+                            .join(' | ')}
+                    </div>
+                </div>
+            `;
+            container.appendChild(bayesianStep);
+            
+            // Add ontology reasoning steps
+            steps.forEach((step, index) => {
+                const div = document.createElement('div');
+                div.className = 'reasoning-step';
+                div.innerHTML = `
+                    <div class="step-number">${index + 1}</div>
+                    <div class="step-content">
+                        <div class="step-title">${step.title}</div>
+                        <div class="step-description">${step.description}</div>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+        
+        function displayConfidence(confidence) {
+            document.getElementById('confidenceScore').textContent = confidence + '%';
+            document.getElementById('confidenceFill').style.width = confidence + '%';
+            
+            let text = '';
+            if (confidence >= 90) text = '高置信度 - 基于完整数据和明确指南 High Confidence - Complete data and clear guidelines';
+            else if (confidence >= 70) text = '中等置信度 - 部分数据缺失 Moderate Confidence - Some missing data';
+            else text = '低置信度 - 建议MDT讨论 Low Confidence - Recommend MDT discussion';
+            
+            document.getElementById('confidenceText').textContent = text;
+        }
+        
+        function displayAlerts(patient, cancerProb, recurrenceRisk) {
+            const alertsSection = document.getElementById('alertsSection');
+            alertsSection.innerHTML = '';
+            
+            if (recurrenceRisk > 0.30) {
+                const alert = document.createElement('div');
+                alert.className = 'alert-panel alert-critical';
+                alert.innerHTML = `
+                    <div class="alert-title">🚨 高复发风险 High Recurrence Risk</div>
+                    <p>5年复发风险超过30%，建议积极治疗和密切随访</p>
+                    <p>5-year recurrence risk exceeds 30%, recommend aggressive treatment and close follow-up</p>
+                `;
+                alertsSection.appendChild(alert);
+            }
+            
+            if (patient.her2 === 'Positive') {
+                const alert = document.createElement('div');
+                alert.className = 'alert-panel alert-info';
+                alert.innerHTML = `
+                    <div class="alert-title">ℹ️ HER2阳性 HER2-Positive</div>
+                    <p>强烈推荐抗HER2靶向治疗(Trastuzumab/Pertuzumab)</p>
+                    <p>Strongly recommend anti-HER2 targeted therapy</p>
+                `;
+                alertsSection.appendChild(alert);
+            }
+        }
+        
+        function calculateConfidence(patient) {
+            let score = 0;
+            const fields = [
+                patient.age, patient.tumorSize, patient.er, patient.pr, 
+                patient.her2, patient.ki67, patient.stage, patient.lymphNode, patient.grade
+            ];
+            
+            fields.forEach(field => {
+                if (field !== null && field !== '' && field !== undefined) score += 10;
+            });
+            
+            return Math.min(score, 95);
+        }
+        
+        function getSubtypeClass(subtype) {
+            if (!subtype) return '';
+            if (subtype.includes('Luminal A')) return 'luminalA';
+            if (subtype.includes('Luminal B')) return 'luminalB';
+            if (subtype.includes('HER2')) return 'her2';
+            if (subtype.includes('Triple')) return 'tnbc';
+            return '';
+        }
+        
+        function resetForm() {
+            document.getElementById('patientAge').value = '';
+            document.getElementById('tumorSize').value = '';
+            document.getElementById('erStatus').value = '';
+            document.getElementById('erPercent').value = '';
+            document.getElementById('prStatus').value = '';
+            document.getElementById('prPercent').value = '';
+            document.getElementById('her2Status').value = '';
+            document.getElementById('ki67Index').value = '';
+            document.getElementById('clinicalStage').value = '';
+            document.getElementById('lymphNode').value = '';
+            document.getElementById('histoGrade').value = '';
+            document.getElementById('familyHistory').checked = false;
+            document.getElementById('resultsContainer').classList.remove('active');
+        }
+        
+        // Action handlers
+        function approveRecommendation() {
+            if (confirm('确认批准此推荐方案？ Approve this recommendation?')) {
+                alert('✅ 推荐方案已批准并记录到患者档案\nRecommendation approved and recorded to patient file');
+            }
+        }
+        
+        function modifyRecommendation() {
+            alert('✏️ 打开方案修改界面...\nOpening modification interface...');
+        }
+        
+        function rejectRecommendation() {
+            const reason = prompt('请输入拒绝理由 Please enter rejection reason:');
+            if (reason && reason.trim()) {
+                alert('❌ 推荐方案已拒绝，理由已记录\nRecommendation rejected, reason recorded');
+            }
+        }
+        
+        function printRecommendation() {
+            window.print();
+        }
+    </script>
+</body>
+</html>
